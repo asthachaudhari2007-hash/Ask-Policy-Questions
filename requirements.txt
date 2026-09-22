@@ -1,0 +1,6 @@
+Flask
+PyMuPDF
+scikit-learn
+reportlab
+numpy
+gunicorn
