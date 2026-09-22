@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PolicyGuard AI | Evidence-Aware Policy Intelligence</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<header class="navbar">
+  <div class="brand">
+    <div class="logo">P</div>
+    <div>
+      <div class="brand-name">PolicyGuard <span>AI</span></div>
+    </div>
+  </div>
+  <nav>
+    <a href="#home">Home</a>
+    <a href="#workspace">Workspace</a>
+    <a href="#how">How It Works</a>
+    <a href="#about">About</a>
+  </nav>
+</header>
+
+<section id="home" class="hero">
+  <span class="pill" data-i18n="pill">Evidence-Aware Policy Intelligence</span>
+  <h1 data-i18n-html="heroTitleHtml">Ask Policy Questions. <span>Get Evidence.</span></h1>
+  <p data-i18n="heroDesc">PolicyGuard AI determines whether your policy questions can be responsibly answered
+     from the available documents — and tells you when the evidence is insufficient.</p>
+  <div class="hero-links">
+    <a href="#workspace" data-i18n="startAnalyzing">Start Analyzing &rarr;</a>
+    <a href="#how" data-i18n="howItWorksLink">How It Works</a>
+  </div>
+
+  <div class="lang-toggle" role="group" aria-label="Language">
+    <button type="button" class="lang-btn active" data-lang="en" onclick="setLanguage('en')">English</button>
+    <button type="button" class="lang-btn" data-lang="hi" onclick="setLanguage('hi')">हिंदी</button>
+  </div>
+</section>
+
+<section id="workspace" class="workspace">
+
+  <div class="panel upload-panel">
+    <h3>
+      <span class="step-badge {% if indexed_chunks and indexed_chunks > 0 %}step-done{% else %}step-active{% endif %}">
+        {% if indexed_chunks and indexed_chunks > 0 %}&check;{% else %}1{% endif %}
+      </span>
+      <span data-i18n="uploadHeading">Upload a policy document</span>
+    </h3>
+    <form action="/upload" method="POST" enctype="multipart/form-data" id="upload-form">
+      <div class="dropzone">
+        <div class="upload-icon">&uarr;</div>
+        <label>
+          <input type="file" name="file" accept="application/pdf" required>
+          <span data-i18n="dropzoneLabel">Choose a PDF file or drag and drop your document here</span>
+        </label>
+        <span class="hint" data-i18n="pdfHint">PDF files only</span>
+      </div>
+      <button type="submit" class="btn-primary" data-i18n="uploadBtn">Upload &amp; Process &rarr;</button>
+    </form>
+
+    {% if success %}
+    <div class="alert-success" data-filename="{{ filename }}" data-pages="{{ pages }}">
+      <strong data-i18n="docProcessed">&check; Document processed successfully</strong>
+      <p data-i18n-dynamic="docProcessedDesc">{{ filename }} has been uploaded and {{ pages }} page(s) were extracted.</p>
+    </div>
+    {% endif %}
+
+    <p class="index-status" data-chunks="{{ indexed_chunks or 0 }}">
+      {% if indexed_chunks and indexed_chunks > 0 %}
+        Index ready — {{ indexed_chunks }} passages searchable.
+      {% else %}
+        No documents indexed yet.
+      {% endif %}
+    </p>
+  </div>
+
+  <div class="panel ask-panel {% if not indexed_chunks or indexed_chunks == 0 %}panel-locked{% endif %}">
+    <h3>
+      <span class="step-badge {% if indexed_chunks and indexed_chunks > 0 %}step-active{% else %}step-locked{% endif %}">2</span>
+      <span data-i18n="askHeading">Ask a question</span>
+    </h3>
+
+    {% if indexed_chunks and indexed_chunks > 0 %}
+      <textarea id="question-input" data-i18n-placeholder="questionPlaceholder" placeholder="e.g. Can a dean waive the 75% attendance requirement for a medical emergency? (English, Hindi, or Hinglish)"></textarea>
+      <button id="ask-btn" type="button" class="btn-primary" data-i18n="analyzeBtn">Analyze Question &rarr;</button>
+      <button id="compare-btn" type="button" class="btn-secondary" data-i18n="compareBtn">🔀 Compare Across Documents</button>
+
+      <div class="evidence-note">
+        <strong data-i18n="evidenceFirstTitle">&#128161; Evidence-first approach</strong>
+        <p data-i18n="evidenceFirstDesc">The system will not simply generate an answer. It first checks whether
+           sufficient evidence exists in your documents.</p>
+      </div>
+
+      <div id="result-area"></div>
+      <div id="compare-area"></div>
+    {% else %}
+      <div class="locked-message">
+        <div class="lock-icon">&#128274;</div>
+        <p><strong data-i18n="lockedTitle">Complete Step 1 first.</strong></p>
+        <p data-i18n="lockedDesc">Upload and process a policy document before asking questions.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</section>
+
+{% if indexed_chunks and indexed_chunks > 0 %}
+<section class="trends-section">
+  <div class="panel trends-panel">
+    <h3><span data-i18n="trendsHeading">📈 Policy Trend Visualization</span></h3>
+    <p class="trends-desc" data-i18n="trendsDesc">Pick a metric to see how it changes across years, based on year-tagged figures found in your documents.</p>
+    <div class="trends-controls">
+      <select id="metric-select">
+        <option value="">All metrics</option>
+        <option value="GER">GER (Gross Enrolment Ratio)</option>
+        <option value="PTR">PTR (Pupil-Teacher Ratio)</option>
+        <option value="dropout">Dropout</option>
+        <option value="enrolment">Enrolment</option>
+        <option value="attendance">Attendance</option>
+        <option value="literacy rate">Literacy rate</option>
+      </select>
+      <button id="trend-btn" type="button" class="btn-primary" data-i18n="trendBtn">Show Trend</button>
+    </div>
+    <div id="trend-area"></div>
+  </div>
+</section>
+
+<section class="analysis-section">
+  <div class="panel analysis-panel">
+    <h3><span data-i18n="analysisHeading">⚠️ Advanced Policy Analysis</span></h3>
+    <p class="analysis-desc" data-i18n="analysisDesc">Flags possible contradictions and risk clauses, and generates an extractive summary per document. These are candidates for your own review, not verified conclusions.</p>
+    <button id="analysis-btn" type="button" class="btn-primary" data-i18n="runAnalysisBtn">Run Advanced Analysis</button>
+    <div id="analysis-area"></div>
+  </div>
+</section>
+
+<section class="challenge-section">
+  <div class="panel challenge-panel">
+    <h3><span data-i18n="challengeHeading">🧪 Challenge the AI</span></h3>
+    <p class="challenge-desc" data-i18n="challengeDesc">Runs adversarial and self-consistency questions against your current documents to check the answerability gate is behaving correctly.</p>
+    <button id="challenge-btn" type="button" class="btn-primary" data-i18n="runChallengeBtn">Run Challenge Tests</button>
+    <div id="challenge-area"></div>
+  </div>
+</section>
+
+<section class="history-section">
+  <div class="panel history-panel">
+    <div class="history-header">
+      <h3><span data-i18n="historyHeading">📋 Question History &amp; Stats</span></h3>
+      <div class="history-actions">
+        <button id="export-pdf-btn" type="button" class="btn-link" data-i18n="exportPdfBtn">📄 Export PDF</button>
+        <button id="export-csv-btn" type="button" class="btn-link" data-i18n="exportCsvBtn">📊 Export CSV</button>
+        <button id="clear-history-btn" type="button" class="btn-link" data-i18n="clearHistoryBtn">Clear</button>
+      </div>
+    </div>
+    <div id="history-stats" class="history-stats-grid"></div>
+    <div id="history-list" class="history-list"></div>
+  </div>
+</section>
+{% endif %}
+
+<footer id="how" class="how-it-works">
+  <h4 data-i18n="howItWorksHeading">How it works</h4>
+  <p data-i18n="howItWorksDesc">Retrieve top-matching passages (BM25 + TF-IDF hybrid) &rarr; check evidence coverage
+     and retrieval confidence &rarr; answer with citations if sufficient, otherwise abstain
+     and explain the missing information.</p>
+</footer>
+
+<script>
+// ---------------------------------------------------------------------------
+// i18n: English / Hindi UI toggle
+// ---------------------------------------------------------------------------
+// Only the interface chrome is translated (labels, buttons, verdicts). The
+// underlying answer and evidence text stays in English because the source
+// documents are English — translating THAT would be a real MT problem, not
+// a UI problem. This keeps the design consistent with the "no external
+// translation API" approach used in lang_support.py.
+
+let currentLang = "en";
+
+const TRANSLATIONS = {
+  en: {
+    pill: "Evidence-Aware Policy Intelligence",
+    heroTitleHtml: 'Ask Policy Questions. <span>Get Evidence.</span>',
+    heroDesc: "PolicyGuard AI determines whether your policy questions can be responsibly answered from the available documents — and tells you when the evidence is insufficient.",
+    startAnalyzing: "Start Analyzing →",
+    howItWorksLink: "How It Works",
+    uploadHeading: "Upload a policy document",
+    dropzoneLabel: "Choose a PDF file or drag and drop your document here",
+    pdfHint: "PDF files only",
+    uploadBtn: "Upload & Process →",
+    indexReady: "Index ready — {n} passages searchable.",
+    noIndex: "No documents indexed yet.",
+    docProcessed: "✓ Document processed successfully",
+    docProcessedDesc: "{filename} has been uploaded and {pages} page(s) were extracted.",
+    askHeading: "Ask a question",
+    questionPlaceholder: "e.g. Can a dean waive the 75% attendance requirement for a medical emergency? (English, Hindi, or Hinglish)",
+    analyzeBtn: "Analyze Question →",
+    evidenceFirstTitle: "💡 Evidence-first approach",
+    evidenceFirstDesc: "The system will not simply generate an answer. It first checks whether sufficient evidence exists in your documents.",
+    lockedTitle: "Complete Step 1 first.",
+    lockedDesc: "Upload and process a policy document before asking questions.",
+    howItWorksHeading: "How it works",
+    howItWorksDesc: "Retrieve top-matching passages (BM25 + TF-IDF hybrid) → check evidence coverage and retrieval confidence → answer with citations if sufficient, otherwise abstain and explain the missing information.",
+    pleaseEnter: "Please enter a question.",
+    analyzing: "Analyzing...",
+    requestFailed: "Request failed:",
+    somethingWrong: "Something went wrong.",
+    answerableLabel: "✔ Answerable",
+    abstainLabel: "✕ Insufficient Evidence — Abstaining",
+    confidenceLabel: "Confidence",
+    coverageLabel: "Evidence coverage",
+    answerPrefix: "Answer:",
+    whyPrefix: "Why:",
+    retrievedEvidence: "Retrieved evidence:",
+    decisionTraceSummary: "Decision trace — why this verdict?",
+    detectedLanguage: "Detected language",
+    languageNoteDesc: "Your question was matched against the English document corpus using these translated terms:",
+    noTermsMatched: "No domain terms recognized in the glossary — retrieval used your original wording.",
+    confidenceSuffix: "confidence",
+    hindiWord: "Hindi",
+    hinglishWord: "Hinglish",
+    listenLabel: "Listen to answer",
+    stopLabel: "Stop",
+    speechNotSupported: "Voice output isn't supported in this browser.",
+    compareBtn: "🔀 Compare Across Documents",
+    decomposedHeading: "This question was split into parts:",
+    compareHeading: "Comparison across documents",
+    trendsHeading: "📈 Policy Trend Visualization",
+    trendsDesc: "Pick a metric to see how it changes across years, based on year-tagged figures found in your documents.",
+    trendBtn: "Show Trend",
+    trendEmpty: "No matching year-tagged data points were found for this metric.",
+    trendLoading: "Finding trend data...",
+    historyHeading: "📋 Question History & Stats",
+    clearHistoryBtn: "Clear",
+    noHistoryYet: "No questions asked yet this session.",
+    totalQuestionsLabel: "Questions asked",
+    answerableCountLabel: "Answerable",
+    abstainedCountLabel: "Abstained",
+    avgConfidenceLabel: "Avg. confidence",
+    viewLabel: "View",
+    multiPartLabel: "Multi-part",
+    exportPdfBtn: "📄 Export PDF",
+    exportCsvBtn: "📊 Export CSV",
+    noSessionToExport: "No questions in this session to export yet.",
+    challengeHeading: "🧪 Challenge the AI",
+    challengeDesc: "Runs adversarial and self-consistency questions against your current documents to check the answerability gate is behaving correctly.",
+    runChallengeBtn: "Run Challenge Tests",
+    challengeRunning: "Running challenge tests...",
+    passedLabel: "passed",
+    expectedLabel: "Expected",
+    actualLabel: "Actual",
+    analysisHeading: "⚠️ Advanced Policy Analysis",
+    analysisDesc: "Flags possible contradictions and risk clauses, and generates an extractive summary per document. These are candidates for your own review, not verified conclusions.",
+    runAnalysisBtn: "Run Advanced Analysis",
+    contradictionsHeading: "Possible Contradictions",
+    noContradictions: "No candidate contradictions found across your documents.",
+    riskFlagsHeading: "Risk / Flagged Clauses",
+    noRiskFlags: "No risk-associated language detected.",
+    summaryHeading: "Document Summaries",
+  },
+  hi: {
+    pill: "साक्ष्य-आधारित नीति बुद्धिमत्ता",
+    heroTitleHtml: 'नीति संबंधी प्रश्न पूछें। <span>साक्ष्य प्राप्त करें।</span>',
+    heroDesc: "पॉलिसीगार्ड एआई यह तय करता है कि आपके नीति संबंधी प्रश्नों का उत्तर उपलब्ध दस्तावेज़ों से ज़िम्मेदारी से दिया जा सकता है या नहीं — और बताता है कि साक्ष्य कब अपर्याप्त है।",
+    startAnalyzing: "विश्लेषण शुरू करें →",
+    howItWorksLink: "यह कैसे काम करता है",
+    uploadHeading: "एक नीति दस्तावेज़ अपलोड करें",
+    dropzoneLabel: "एक PDF फ़ाइल चुनें या अपना दस्तावेज़ यहाँ खींचें और छोड़ें",
+    pdfHint: "केवल PDF फ़ाइलें",
+    uploadBtn: "अपलोड करें और प्रोसेस करें →",
+    indexReady: "इंडेक्स तैयार है — {n} अंश खोजे जा सकते हैं।",
+    noIndex: "अभी तक कोई दस्तावेज़ इंडेक्स नहीं किया गया।",
+    docProcessed: "✓ दस्तावेज़ सफलतापूर्वक प्रोसेस हुआ",
+    docProcessedDesc: "{filename} अपलोड हो गया है और {pages} पृष्ठ निकाले गए हैं।",
+    askHeading: "एक प्रश्न पूछें",
+    questionPlaceholder: "उदा. क्या डीन चिकित्सा आपातस्थिति के लिए 75% उपस्थिति की शर्त माफ कर सकते हैं? (अंग्रेज़ी, हिंदी, या हिंग्लिश)",
+    analyzeBtn: "प्रश्न का विश्लेषण करें →",
+    evidenceFirstTitle: "💡 साक्ष्य-प्रथम दृष्टिकोण",
+    evidenceFirstDesc: "यह प्रणाली सीधे उत्तर नहीं बनाती। यह पहले जांचती है कि आपके दस्तावेज़ों में पर्याप्त साक्ष्य मौजूद है या नहीं।",
+    lockedTitle: "पहले चरण 1 पूरा करें।",
+    lockedDesc: "प्रश्न पूछने से पहले एक नीति दस्तावेज़ अपलोड और प्रोसेस करें।",
+    howItWorksHeading: "यह कैसे काम करता है",
+    howItWorksDesc: "शीर्ष-मिलान अंश प्राप्त करें (BM25 + TF-IDF हाइब्रिड) → साक्ष्य कवरेज और पुनर्प्राप्ति विश्वास जांचें → पर्याप्त होने पर उद्धरणों सहित उत्तर दें, अन्यथा उत्तर न दें और कमी बताएं।",
+    pleaseEnter: "कृपया एक प्रश्न दर्ज करें।",
+    analyzing: "विश्लेषण हो रहा है...",
+    requestFailed: "अनुरोध विफल:",
+    somethingWrong: "कुछ गलत हो गया।",
+    answerableLabel: "✔ उत्तर देने योग्य",
+    abstainLabel: "✕ अपर्याप्त साक्ष्य — उत्तर नहीं दिया जा रहा",
+    confidenceLabel: "विश्वास",
+    coverageLabel: "साक्ष्य कवरेज",
+    answerPrefix: "उत्तर:",
+    whyPrefix: "क्यों:",
+    retrievedEvidence: "प्राप्त साक्ष्य:",
+    decisionTraceSummary: "निर्णय ट्रेस — यह निर्णय क्यों?",
+    detectedLanguage: "पहचानी गई भाषा",
+    languageNoteDesc: "आपके प्रश्न को इन अनुवादित शब्दों का उपयोग करके अंग्रेज़ी दस्तावेज़ों से मिलाया गया:",
+    noTermsMatched: "शब्दकोश में कोई विषय-संबंधी शब्द नहीं मिला — खोज आपके मूल शब्दों से की गई।",
+    confidenceSuffix: "विश्वास",
+    hindiWord: "हिंदी",
+    hinglishWord: "हिंग्लिश",
+    listenLabel: "उत्तर सुनें",
+    stopLabel: "रोकें",
+    speechNotSupported: "इस ब्राउज़र में आवाज़ आउटपुट समर्थित नहीं है।",
+    compareBtn: "🔀 दस्तावेज़ों की तुलना करें",
+    decomposedHeading: "इस प्रश्न को भागों में विभाजित किया गया:",
+    compareHeading: "दस्तावेज़ों के बीच तुलना",
+    trendsHeading: "📈 नीति रुझान विज़ुअलाइज़ेशन",
+    trendsDesc: "यह देखने के लिए एक मेट्रिक चुनें कि यह वर्षों में कैसे बदलता है, आपके दस्तावेज़ों में मिले वर्ष-टैग किए गए आंकड़ों के आधार पर।",
+    trendBtn: "रुझान दिखाएं",
+    trendEmpty: "इस मेट्रिक के लिए कोई मेल खाता वर्ष-टैग डेटा नहीं मिला।",
+    trendLoading: "रुझान डेटा खोजा जा रहा है...",
+    historyHeading: "📋 प्रश्न इतिहास और आंकड़े",
+    clearHistoryBtn: "साफ़ करें",
+    noHistoryYet: "इस सत्र में अभी तक कोई प्रश्न नहीं पूछा गया।",
+    totalQuestionsLabel: "पूछे गए प्रश्न",
+    answerableCountLabel: "उत्तर दिए गए",
+    abstainedCountLabel: "उत्तर नहीं दिया गया",
+    avgConfidenceLabel: "औसत विश्वास",
+    viewLabel: "देखें",
+    multiPartLabel: "बहु-भाग",
+    exportPdfBtn: "📄 PDF निर्यात करें",
+    exportCsvBtn: "📊 CSV निर्यात करें",
+    noSessionToExport: "इस सत्र में निर्यात करने के लिए अभी तक कोई प्रश्न नहीं है।",
+    challengeHeading: "🧪 एआई को चुनौती दें",
+    challengeDesc: "यह जांचने के लिए कि उत्तर-योग्यता जांच सही तरीके से काम कर रही है, आपके वर्तमान दस्तावेज़ों के विरुद्ध प्रतिकूल और आत्म-संगति प्रश्न चलाता है।",
+    runChallengeBtn: "चुनौती परीक्षण चलाएं",
+    challengeRunning: "चुनौती परीक्षण चल रहे हैं...",
+    passedLabel: "पास हुए",
+    expectedLabel: "अपेक्षित",
+    actualLabel: "वास्तविक",
+    analysisHeading: "⚠️ उन्नत नीति विश्लेषण",
+    analysisDesc: "संभावित विरोधाभासों और जोखिम खंडों को चिह्नित करता है, और प्रत्येक दस्तावेज़ का सार तैयार करता है। ये आपकी अपनी समीक्षा के लिए उम्मीदवार हैं, सत्यापित निष्कर्ष नहीं।",
+    runAnalysisBtn: "उन्नत विश्लेषण चलाएं",
+    contradictionsHeading: "संभावित विरोधाभास",
+    noContradictions: "आपके दस्तावेज़ों में कोई संभावित विरोधाभास नहीं मिला।",
+    riskFlagsHeading: "जोखिम / चिह्नित खंड",
+    noRiskFlags: "कोई जोखिम-संबंधी भाषा नहीं मिली।",
+    summaryHeading: "दस्तावेज़ सारांश",
+  },
+};
+
+function t(key) {
+  return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key]) || TRANSLATIONS.en[key] || key;
+}
+
+function applyStaticTranslations() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.getAttribute("data-i18n"));
+  });
+  document.querySelectorAll("[data-i18n-html]").forEach(el => {
+    el.innerHTML = t(el.getAttribute("data-i18n-html"));
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    el.placeholder = t(el.getAttribute("data-i18n-placeholder"));
+  });
+
+  // Dynamic bits that mix translated text with server-rendered values.
+  const indexStatus = document.querySelector(".index-status");
+  if (indexStatus) {
+    const chunks = parseInt(indexStatus.getAttribute("data-chunks") || "0", 10);
+    indexStatus.textContent = chunks > 0
+      ? t("indexReady").replace("{n}", chunks)
+      : t("noIndex");
+  }
+
+  const successBox = document.querySelector(".alert-success");
+  if (successBox) {
+    const filename = successBox.getAttribute("data-filename") || "";
+    const pages = successBox.getAttribute("data-pages") || "";
+    const desc = successBox.querySelector("[data-i18n-dynamic='docProcessedDesc']");
+    if (desc) {
+      desc.textContent = t("docProcessedDesc").replace("{filename}", filename).replace("{pages}", pages);
+    }
+  }
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  document.querySelectorAll(".lang-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-lang") === lang);
+  });
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  applyStaticTranslations();
+  if (typeof renderHistoryPanel === "function") renderHistoryPanel();
+}
+
+// Apply once on load (covers the default English state cleanly too).
+applyStaticTranslations();
+
+// ---------------------------------------------------------------------------
+// Ask flow
+// ---------------------------------------------------------------------------
+
+const askBtn = document.getElementById("ask-btn");
+const questionInput = document.getElementById("question-input");
+const resultArea = document.getElementById("result-area");
+
+if (askBtn) {
+  askBtn.addEventListener("click", async () => {
+    const question = questionInput.value.trim();
+    if (!question) {
+      resultArea.innerHTML = `<div class="alert-error">${t("pleaseEnter")}</div>`;
+      return;
+    }
+
+    askBtn.disabled = true;
+    askBtn.textContent = t("analyzing");
+    resultArea.innerHTML = `
+      <div class="loading-skeleton"></div>
+      <div class="loading-skeleton"></div>
+    `;
+
+    try {
+      const res = await fetch("/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        resultArea.innerHTML = `<div class="alert-error">${data.error || t("somethingWrong")}</div>`;
+        return;
+      }
+
+      renderResult(data, question);
+      recordHistory(question, data);
+    } catch (err) {
+      resultArea.innerHTML = `<div class="alert-error">${t("requestFailed")} ${err}</div>`;
+    } finally {
+      askBtn.disabled = false;
+      askBtn.textContent = t("analyzeBtn");
+    }
+  });
+}
+
+function highlightTerms(text, question) {
+  const escape = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  let safeText = escape(text);
+
+  const stopwords = new Set(["a","an","the","is","are","was","were","be","been","of","in","on","at",
+    "to","for","from","by","with","about","as","it","this","that","and","or","if","then","than",
+    "but","not","no","can","may","might","should","would","could","will","shall","do","does","did",
+    "have","has","had","i","you","he","she","they","we","what","when","where","why","how","which",
+    "who","whom","your","our","their","his","her","its","there","here"]);
+
+  const terms = [...new Set(
+    question.toLowerCase().match(/[a-zA-Z]+/g) || []
+  )].filter(t => t.length > 1 && !stopwords.has(t));
+
+  terms.sort((a, b) => b.length - a.length);
+
+  terms.forEach(term => {
+    const re = new RegExp(`\\b(${term})\\b`, "gi");
+    safeText = safeText.replace(re, "<mark>$1</mark>");
+  });
+
+  return safeText;
+}
+
+function scoreBar(label, fraction) {
+  const pct = Math.max(0, Math.min(100, fraction * 100)).toFixed(1);
+  return `
+    <div class="score-row">
+      <div class="score-label"><span>${label}</span><span>${pct}%</span></div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:${pct}%"></div></div>
+    </div>`;
+}
+
+function confidenceBadgeClass(label) {
+  switch (label) {
+    case "High": return "badge-high";
+    case "Medium": return "badge-medium";
+    case "Low": return "badge-low";
+    case "Very Low": return "badge-verylow";
+    default: return "badge-none";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Voice Answer Output (Web Speech API — no external service, fully offline)
+// ---------------------------------------------------------------------------
+// The spoken accent follows the current UI language toggle, but the answer
+// content itself stays English (the source documents are English), same
+// reasoning as the on-screen Hindi/English toggle.
+
+let lastSpokenText = "";
+
+function toggleSpeak() {
+  const btn = document.getElementById("speak-btn");
+  if (!btn) return;
+
+  if (!("speechSynthesis" in window)) {
+    alert(t("speechNotSupported"));
+    return;
+  }
+
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    btn.textContent = "🔊 " + t("listenLabel");
+    return;
+  }
+
+  const utterance = new SpeechSynthesisUtterance(lastSpokenText);
+  utterance.lang = currentLang === "hi" ? "hi-IN" : "en-IN";
+  utterance.rate = 0.95;
+  utterance.onend = () => { btn.textContent = "🔊 " + t("listenLabel"); };
+  utterance.onerror = () => { btn.textContent = "🔊 " + t("listenLabel"); };
+
+  window.speechSynthesis.speak(utterance);
+  btn.textContent = "⏹ " + t("stopLabel");
+}
+
+function renderDecisionTrace(trace) {
+  if (!trace || trace.length === 0) return "";
+
+  let rows = trace.map(step => {
+    const status = step.passed ? "trace-pass" : "trace-fail";
+    const icon = step.passed ? "✔" : "✕";
+    return `
+      <div class="trace-row ${status}">
+        <div class="trace-row-head">
+          <span class="trace-icon">${icon}</span>
+          <span class="trace-check">${step.check}</span>
+          <span class="trace-value">${step.value} (needs ≥ ${step.threshold})</span>
+        </div>
+        <div class="trace-explanation">${step.explanation}</div>
+      </div>`;
+  }).join("");
+
+  return `
+    <details class="decision-trace">
+      <summary>${t("decisionTraceSummary")}</summary>
+      <div class="trace-list">${rows}</div>
+    </details>`;
+}
+
+function renderLanguageNote(data) {
+  if (!data.detected_language || data.detected_language === "english") return "";
+
+  const langLabel = data.detected_language === "hindi" ? t("hindiWord") : t("hinglishWord");
+  let termsHtml = "";
+  if (data.matched_terms && data.matched_terms.length > 0) {
+    const chips = data.matched_terms
+      .map(term => `<span class="term-chip">${term.original} → ${term.english}</span>`)
+      .join(" ");
+    termsHtml = `<div class="term-chips">${chips}</div>`;
+  } else {
+    termsHtml = `<div class="term-chips-empty">${t("noTermsMatched")}</div>`;
+  }
+
+  return `
+    <div class="language-note">
+      <strong>🌐 ${t("detectedLanguage")}: ${langLabel}</strong>
+      <p>${t("languageNoteDesc")}</p>
+      ${termsHtml}
+    </div>`;
+}
+
+function renderDecisionCard(data, question, withSpeak) {
+  const verdictClass = data.answerable ? "verdict-answer" : "verdict-abstain";
+  const verdictLabel = data.answerable ? t("answerableLabel") : t("abstainLabel");
+  const badgeClass = confidenceBadgeClass(data.confidence_label);
+  const bodyText = data.answerable ? data.answer : data.reason;
+
+  let html = `
+      ${renderLanguageNote(data)}
+      <div class="verdict-row">
+        <div class="verdict">${verdictLabel}</div>
+        <span class="confidence-badge ${badgeClass}">${data.confidence_label || "N/A"} ${t("confidenceSuffix")}</span>
+      </div>`;
+
+  if (withSpeak) {
+    lastSpokenText = `${verdictLabel}. ${t("confidenceLabel")}: ${data.confidence_label || ""}. ${bodyText}`;
+    html += `<button type="button" id="speak-btn" class="speak-btn" onclick="toggleSpeak()">🔊 ${t("listenLabel")}</button>`;
+  }
+
+  html += scoreBar(t("confidenceLabel"), data.confidence);
+  html += scoreBar(t("coverageLabel"), data.coverage);
+
+  if (data.answerable) {
+    html += `<div class="answer-text"><strong>${t("answerPrefix")}</strong> ${highlightTerms(data.answer, question)}</div>`;
+  } else {
+    html += `<div class="abstain-reason"><strong>${t("whyPrefix")}</strong> ${data.reason}</div>`;
+  }
+
+  html += renderDecisionTrace(data.decision_trace);
+
+  html += `<div class="evidence-list"><strong>${t("retrievedEvidence")}</strong>`;
+  data.evidence.forEach((e) => {
+    html += `<div class="evidence-item">
+        <div class="evidence-meta">${e.doc} — page ${e.page} · score ${e.score}</div>
+        <div class="evidence-text">${highlightTerms(e.text, question)}</div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  return html;
+}
+
+function renderResult(data, question) {
+  // Question Decomposition: show one mini result-card per sub-question.
+  if (data.decomposed) {
+    let html = `<div class="decomposed-heading">🧩 ${t("decomposedHeading")}</div>`;
+    data.sub_questions.forEach((sub, i) => {
+      const cls = sub.answerable ? "verdict-answer" : "verdict-abstain";
+      html += `<div class="result-card sub-question-card ${cls}">
+          <div class="sub-question-label">${i + 1}. ${sub.question}</div>
+          ${renderDecisionCard(sub, sub.question, i === 0)}
+        </div>`;
+    });
+    resultArea.innerHTML = html;
+    return;
+  }
+
+  const verdictClass = data.answerable ? "verdict-answer" : "verdict-abstain";
+  resultArea.innerHTML = `<div class="result-card ${verdictClass}">${renderDecisionCard(data, question, true)}</div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Cross-Document Comparison (#16)
+// ---------------------------------------------------------------------------
+
+const compareBtn = document.getElementById("compare-btn");
+const compareArea = document.getElementById("compare-area");
+
+if (compareBtn) {
+  compareBtn.addEventListener("click", async () => {
+    const question = questionInput.value.trim();
+    if (!question) {
+      compareArea.innerHTML = `<div class="alert-error">${t("pleaseEnter")}</div>`;
+      return;
+    }
+
+    compareBtn.disabled = true;
+    compareArea.innerHTML = `<div class="loading-skeleton"></div><div class="loading-skeleton"></div>`;
+
+    try {
+      const res = await fetch("/compare", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        compareArea.innerHTML = `<div class="alert-error">${data.error || t("somethingWrong")}</div>`;
+        return;
+      }
+
+      renderComparison(data, question);
+    } catch (err) {
+      compareArea.innerHTML = `<div class="alert-error">${t("requestFailed")} ${err}</div>`;
+    } finally {
+      compareBtn.disabled = false;
+    }
+  });
+}
+
+function renderComparison(data, question) {
+  let html = `<div class="compare-heading">${t("compareHeading")}</div><div class="compare-grid">`;
+  data.documents.forEach((d) => {
+    const cls = d.answerable ? "verdict-answer" : "verdict-abstain";
+    html += `<div class="compare-card ${cls}">
+        <div class="compare-doc-name">${d.doc}</div>
+        <span class="confidence-badge ${confidenceBadgeClass(d.confidence_label)}">${d.confidence_label} ${t("confidenceSuffix")}</span>
+        ${d.answerable
+          ? `<div class="answer-text">${highlightTerms(d.answer, question)}<div class="evidence-meta">page ${d.page}</div></div>`
+          : `<div class="abstain-reason">${d.reason}</div>`}
+      </div>`;
+  });
+  html += `</div>`;
+  compareArea.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// Temporal Policy Analysis + Trend Visualization (#17 / #18)
+// ---------------------------------------------------------------------------
+
+const trendBtn = document.getElementById("trend-btn");
+const trendArea = document.getElementById("trend-area");
+const metricSelect = document.getElementById("metric-select");
+
+if (trendBtn) {
+  trendBtn.addEventListener("click", async () => {
+    const metric = metricSelect.value;
+    trendBtn.disabled = true;
+    trendArea.innerHTML = `<div class="loading-skeleton"></div>`;
+
+    try {
+      const res = await fetch("/trends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metric }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        trendArea.innerHTML = `<div class="alert-error">${data.error || t("somethingWrong")}</div>`;
+        return;
+      }
+
+      trendArea.innerHTML = renderTrendChart(data.points);
+    } catch (err) {
+      trendArea.innerHTML = `<div class="alert-error">${t("requestFailed")} ${err}</div>`;
+    } finally {
+      trendBtn.disabled = false;
+    }
+  });
+}
+
+const TREND_COLORS = ["#4f46e5", "#16a34a", "#dc2626", "#b45309", "#0891b2", "#9333ea", "#be185d"];
+
+function renderTrendChart(points) {
+  if (!points || points.length === 0) {
+    return `<p class="trend-empty">${t("trendEmpty")}</p>`;
+  }
+
+  // Group points by metric so each metric draws its own line/color instead
+  // of all points being connected into one zigzagging path regardless of
+  // which metric they belong to (the bug: mixing GER%, PTR ratios, and raw
+  // counts into a single line produced an unreadable jumble).
+  const metrics = [...new Set(points.map(p => p.metric))];
+
+  // Distinct x-axis positions by YEAR NUMBER, not by year string — "2014"
+  // and "2014-15" both sort to the same year and were previously drawn as
+  // two overlapping labels at the same x position, garbling the text.
+  const uniqueYearSorts = [...new Set(points.map(p => p.year_sort))].sort((a, b) => a - b);
+
+  const height = 260, padding = 44, bottomPadding = 70;
+  const perYearWidth = 46;
+  const width = Math.max(560, uniqueYearSorts.length * perYearWidth);
+
+  const series = metrics.map((metric, i) => ({
+    metric,
+    color: TREND_COLORS[i % TREND_COLORS.length],
+    points: points.filter(p => p.metric === metric).sort((a, b) => a.year_sort - b.year_sort),
+  }));
+
+  const values = points.map(p => p.value);
+  const minY = Math.min(...values), maxY = Math.max(...values);
+  const minX = uniqueYearSorts[0], maxX = uniqueYearSorts[uniqueYearSorts.length - 1];
+
+  const xScale = (x) => padding + (maxX === minX ? (width - 2 * padding) / 2 : (x - minX) / (maxX - minX) * (width - 2 * padding));
+  const yScale = (y) => (height - bottomPadding) - (maxY === minY ? (height - padding - bottomPadding) / 2 : (y - minY) / (maxY - minY) * (height - padding - bottomPadding));
+
+  let svgContent = "";
+  series.forEach((s) => {
+    const pathD = s.points.map((p, i) => `${i === 0 ? "M" : "L"} ${xScale(p.year_sort).toFixed(1)} ${yScale(p.value).toFixed(1)}`).join(" ");
+    svgContent += `<path d="${pathD}" fill="none" stroke="${s.color}" stroke-width="2" />`;
+    s.points.forEach((p) => {
+      svgContent += `<circle cx="${xScale(p.year_sort).toFixed(1)}" cy="${yScale(p.value).toFixed(1)}" r="4" fill="${s.color}"><title>${p.metric}: ${p.value} (${p.year})</title></circle>`;
+    });
+  });
+
+  // One label per distinct year value, rotated so adjacent labels (which can
+  // be as little as ~1 year apart) don't overlap horizontally.
+  const yearLabels = uniqueYearSorts.map((ys) => {
+    // Prefer a range-format label ("2014-15") over a bare year if both exist
+    // for this position, since it's more informative.
+    const match = points.find(p => p.year_sort === ys && p.year.includes("-")) || points.find(p => p.year_sort === ys);
+    const x = xScale(ys);
+    const y = height - bottomPadding + 14;
+    return `<text x="${x.toFixed(1)}" y="${y}" font-size="10" text-anchor="end" fill="#6b7280" transform="rotate(-45, ${x.toFixed(1)}, ${y})">${match.year}</text>`;
+  }).join("");
+
+  const legend = series.map(s => `
+      <span class="trend-legend-item"><span class="trend-legend-swatch" style="background:${s.color}"></span>${s.metric}</span>`).join("");
+
+  return `
+    <div class="trend-legend">${legend}</div>
+    <div class="trend-chart-scroll">
+      <svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" class="trend-svg">
+        <line x1="${padding}" y1="${height - bottomPadding}" x2="${width - padding}" y2="${height - bottomPadding}" stroke="#e5e7eb" />
+        <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - bottomPadding}" stroke="#e5e7eb" />
+        ${svgContent}
+        ${yearLabels}
+      </svg>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Question History + Session Stats (#30 / #31 / #32)
+// ---------------------------------------------------------------------------
+// Lives entirely in this tab's memory for the current session — resets on
+// page reload, same scope as "session" elsewhere in this app.
+
+let sessionHistory = [];
+
+function getLeafConfidences(data) {
+  if (data.decomposed) {
+    return data.sub_questions.map(sq => sq.confidence).filter(c => typeof c === "number");
+  }
+  return typeof data.confidence === "number" ? [data.confidence] : [];
+}
+
+function recordHistory(question, data) {
+  sessionHistory.push({
+    id: Date.now() + Math.random(),
+    question,
+    data,
+    answerable: data.answerable,
+    decomposed: !!data.decomposed,
+    timestamp: new Date(),
+  });
+  renderHistoryPanel();
+}
+
+function clearHistory() {
+  sessionHistory = [];
+  renderHistoryPanel();
+}
+
+const clearHistoryBtn = document.getElementById("clear-history-btn");
+if (clearHistoryBtn) {
+  clearHistoryBtn.addEventListener("click", clearHistory);
+}
+
+function viewHistoryEntry(id) {
+  const entry = sessionHistory.find(h => h.id === id);
+  if (!entry) return;
+  renderResult(entry.data, entry.question);
+  resultArea.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderHistoryPanel() {
+  const statsEl = document.getElementById("history-stats");
+  const listEl = document.getElementById("history-list");
+  if (!statsEl || !listEl) return;
+
+  const total = sessionHistory.length;
+  const answerableCount = sessionHistory.filter(h => h.answerable).length;
+  const abstainedCount = total - answerableCount;
+  const allConfidences = sessionHistory.flatMap(h => getLeafConfidences(h.data));
+  const avgConfidence = allConfidences.length
+    ? (allConfidences.reduce((a, b) => a + b, 0) / allConfidences.length * 100).toFixed(1) + "%"
+    : "—";
+
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">${t("totalQuestionsLabel")}</div></div>
+    <div class="stat-card stat-answerable"><div class="stat-value">${answerableCount}</div><div class="stat-label">${t("answerableCountLabel")}</div></div>
+    <div class="stat-card stat-abstained"><div class="stat-value">${abstainedCount}</div><div class="stat-label">${t("abstainedCountLabel")}</div></div>
+    <div class="stat-card"><div class="stat-value">${avgConfidence}</div><div class="stat-label">${t("avgConfidenceLabel")}</div></div>
+  `;
+
+  if (total === 0) {
+    listEl.innerHTML = `<p class="history-empty">${t("noHistoryYet")}</p>`;
+    return;
+  }
+
+  listEl.innerHTML = [...sessionHistory].reverse().map(entry => {
+    const cls = entry.answerable ? "verdict-answer" : "verdict-abstain";
+    const icon = entry.answerable ? "✔" : "✕";
+    const badge = entry.decomposed ? t("multiPartLabel") : (entry.data.confidence_label || "");
+    const time = entry.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `
+      <div class="history-item ${cls}" onclick="viewHistoryEntry(${entry.id})">
+        <div class="history-item-main">
+          <span class="history-icon">${icon}</span>
+          <span class="history-question">${entry.question}</span>
+        </div>
+        <div class="history-item-meta">
+          <span class="history-badge">${badge}</span>
+          <span class="history-time">${time}</span>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+renderHistoryPanel();
+
+// ---------------------------------------------------------------------------
+// Export Research Report: PDF + CSV (#33/#34/#35)
+// ---------------------------------------------------------------------------
+
+function sessionToExportPayload() {
+  // Flattens sessionHistory into one row per answerable unit — a decomposed
+  // question contributes one row per sub-question, so the export always
+  // lines up with individually-scored verdicts rather than a parent
+  // question that has no single confidence value of its own.
+  return sessionHistory.flatMap(h => {
+    const d = h.data;
+    if (d.decomposed) {
+      return d.sub_questions.map(sq => ({
+        question: sq.question,
+        answerable: sq.answerable,
+        confidence_label: sq.confidence_label,
+        confidence: sq.confidence,
+        coverage: sq.coverage,
+        reason: sq.reason,
+        answer: sq.answer,
+        evidence: sq.evidence,
+      }));
+    }
+    return [{
+      question: h.question,
+      answerable: d.answerable,
+      confidence_label: d.confidence_label,
+      confidence: d.confidence,
+      coverage: d.coverage,
+      reason: d.reason,
+      answer: d.answer,
+      evidence: d.evidence,
+    }];
+  });
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+const exportPdfBtn = document.getElementById("export-pdf-btn");
+if (exportPdfBtn) {
+  exportPdfBtn.addEventListener("click", async () => {
+    const session = sessionToExportPayload();
+    if (session.length === 0) {
+      alert(t("noSessionToExport"));
+      return;
+    }
+    exportPdfBtn.disabled = true;
+    try {
+      const res = await fetch("/export/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || t("somethingWrong"));
+        return;
+      }
+      const blob = await res.blob();
+      triggerDownload(blob, "policyguard_session_report.pdf");
+    } catch (err) {
+      alert(t("requestFailed") + " " + err);
+    } finally {
+      exportPdfBtn.disabled = false;
+    }
+  });
+}
+
+function csvEscape(value) {
+  const s = String(value ?? "");
+  if (/[",\n]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+const exportCsvBtn = document.getElementById("export-csv-btn");
+if (exportCsvBtn) {
+  exportCsvBtn.addEventListener("click", () => {
+    const session = sessionToExportPayload();
+    if (session.length === 0) {
+      alert(t("noSessionToExport"));
+      return;
+    }
+
+    const headers = ["Question", "Verdict", "Confidence Label", "Confidence", "Coverage", "Answer / Reason", "Top Evidence Doc", "Top Evidence Page"];
+    const rows = session.map(s => {
+      const verdict = s.answerable ? "Answerable" : "Insufficient Evidence";
+      const body = s.answerable ? (s.answer || "") : (s.reason || "");
+      const topEvidence = (s.evidence && s.evidence[0]) || {};
+      return [
+        s.question,
+        verdict,
+        s.confidence_label || "",
+        typeof s.confidence === "number" ? (s.confidence * 100).toFixed(1) + "%" : "",
+        typeof s.coverage === "number" ? (s.coverage * 100).toFixed(1) + "%" : "",
+        body,
+        topEvidence.doc || "",
+        topEvidence.page ?? "",
+      ].map(csvEscape).join(",");
+    });
+
+    const csv = [headers.map(csvEscape).join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    triggerDownload(blob, "policyguard_session.csv");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// "Challenge the AI" Test Mode (#29)
+// ---------------------------------------------------------------------------
+
+const challengeBtn = document.getElementById("challenge-btn");
+const challengeArea = document.getElementById("challenge-area");
+
+if (challengeBtn) {
+  challengeBtn.addEventListener("click", async () => {
+    challengeBtn.disabled = true;
+    challengeArea.innerHTML = `<div class="loading-skeleton"></div><div class="loading-skeleton"></div><div class="loading-skeleton"></div>`;
+
+    try {
+      const res = await fetch("/challenge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        challengeArea.innerHTML = `<div class="alert-error">${data.error || t("somethingWrong")}</div>`;
+        return;
+      }
+
+      renderChallengeResults(data);
+    } catch (err) {
+      challengeArea.innerHTML = `<div class="alert-error">${t("requestFailed")} ${err}</div>`;
+    } finally {
+      challengeBtn.disabled = false;
+    }
+  });
+}
+
+function renderChallengeResults(data) {
+  const allPassed = data.passed === data.total;
+  let html = `<div class="challenge-summary ${allPassed ? "challenge-summary-pass" : "challenge-summary-fail"}">
+      ${data.passed} / ${data.total} ${t("passedLabel")}
+    </div><div class="challenge-list">`;
+
+  data.results.forEach((r) => {
+    const cls = r.passed ? "challenge-pass" : "challenge-fail";
+    const icon = r.passed ? "✔" : "✕";
+    const expectedText = r.expected_answerable ? t("answerableLabel") : t("abstainLabel");
+    const actualText = r.actual_answerable ? t("answerableLabel") : t("abstainLabel");
+
+    html += `<div class="challenge-item ${cls}">
+        <div class="challenge-item-head">
+          <span class="challenge-icon">${icon}</span>
+          <span class="challenge-question">${r.question}</span>
+        </div>
+        <div class="challenge-note">${r.note}</div>
+        <div class="challenge-verdicts">
+          <span>${t("expectedLabel")}: ${expectedText}</span>
+          <span>${t("actualLabel")}: ${actualText} (${r.confidence_label || "N/A"})</span>
+        </div>
+      </div>`;
+  });
+
+  html += `</div>`;
+  challengeArea.innerHTML = html;
+}
+
+// ---------------------------------------------------------------------------
+// Advanced Policy Analysis: contradictions, risk flags, summaries
+// ---------------------------------------------------------------------------
+
+const analysisBtn = document.getElementById("analysis-btn");
+const analysisArea = document.getElementById("analysis-area");
+
+if (analysisBtn) {
+  analysisBtn.addEventListener("click", async () => {
+    analysisBtn.disabled = true;
+    analysisArea.innerHTML = `<div class="loading-skeleton"></div><div class="loading-skeleton"></div><div class="loading-skeleton"></div>`;
+
+    try {
+      const res = await fetch("/policy-analysis", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        analysisArea.innerHTML = `<div class="alert-error">${data.error || t("somethingWrong")}</div>`;
+        return;
+      }
+
+      renderPolicyAnalysis(data);
+    } catch (err) {
+      analysisArea.innerHTML = `<div class="alert-error">${t("requestFailed")} ${err}</div>`;
+    } finally {
+      analysisBtn.disabled = false;
+    }
+  });
+}
+
+function renderPolicyAnalysis(data) {
+  const numeric = data.contradictions.numeric || [];
+  const textual = data.contradictions.textual || [];
+  const totalContradictions = numeric.length + textual.length;
+
+  let html = `<div class="analysis-block">
+      <h4>⚠️ ${t("contradictionsHeading")} (${totalContradictions})</h4>`;
+  if (totalContradictions === 0) {
+    html += `<p class="analysis-empty">${t("noContradictions")}</p>`;
+  } else {
+    numeric.forEach((c) => {
+      html += `<div class="contradiction-item">
+          <strong>${c.metric}</strong> (${c.year}):
+          <span class="contradiction-doc">${c.doc_a} p.${c.page_a} = ${c.value_a}</span> vs
+          <span class="contradiction-doc">${c.doc_b} p.${c.page_b} = ${c.value_b}</span>
+        </div>`;
+    });
+    textual.forEach((c) => {
+      html += `<div class="contradiction-item">
+          <strong>${c.term_pair}</strong><br/>
+          <span class="contradiction-doc">${c.doc_a} p.${c.page_a}:</span> "${c.snippet_a}..."<br/>
+          <span class="contradiction-doc">${c.doc_b} p.${c.page_b}:</span> "${c.snippet_b}..."
+        </div>`;
+    });
+  }
+  html += `</div>`;
+
+  html += `<div class="analysis-block">
+      <h4>🚨 ${t("riskFlagsHeading")} (${data.risks.length})</h4>`;
+  if (data.risks.length === 0) {
+    html += `<p class="analysis-empty">${t("noRiskFlags")}</p>`;
+  } else {
+    data.risks.forEach((r) => {
+      html += `<div class="risk-item">
+          <div class="risk-meta">${r.doc} — p.${r.page} · ${r.matched_terms.join(", ")}</div>
+          <div class="risk-sentence">${r.sentence}</div>
+        </div>`;
+    });
+  }
+  html += `</div>`;
+
+  html += `<div class="analysis-block">
+      <h4>📑 ${t("summaryHeading")}</h4>`;
+  Object.keys(data.summaries).forEach((doc) => {
+    html += `<div class="summary-doc-name">${doc}</div><ul class="summary-list">`;
+    data.summaries[doc].forEach((s) => {
+      html += `<li>${s.sentence} <span class="summary-page">(p.${s.page})</span></li>`;
+    });
+    html += `</ul>`;
+  });
+  html += `</div>`;
+
+  analysisArea.innerHTML = html;
+}
+</script>
+
+</body>
+</html>
